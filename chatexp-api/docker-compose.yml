@@ -1,0 +1,201 @@
+x-worker-env: &worker-env
+  # Shared by every celery service (worker / worker-analysis / beat). The api
+  # container adds its own CORS/API-key settings on top of the same backend
+  # configuration below.
+  NO_PROXY: "docling-serve,redis,localhost,127.0.0.1,172.203.0.0/16,::1"
+  no_proxy: "docling-serve,redis,localhost,127.0.0.1,172.203.0.0/16,::1"
+  CHATEXP_REDIS_URL: redis://redis:6379/0
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+  TORCH_NUM_THREADS: "1"
+  TORCH_NUM_INTEROP_THREADS: "1"
+  # LLM settings must reach the workers because the analyze task runs there,
+  # not on the api container. Without these, every analyze job fails with
+  # "LLM is not configured for server-side analysis".
+  CHATEXP_LLM_ENDPOINT: ${CHATEXP_LLM_ENDPOINT:-}
+  CHATEXP_LLM_API_KEY: ${CHATEXP_LLM_API_KEY:-}
+  CHATEXP_LLM_MODEL: ${CHATEXP_LLM_MODEL:-}
+  CHATEXP_LLM_RESPONSE_FORMAT: ${CHATEXP_LLM_RESPONSE_FORMAT:-true}
+  CHATEXP_LLM_MAX_TOKENS: ${CHATEXP_LLM_MAX_TOKENS:-8192}
+  CHATEXP_LLM_PROXY_ALLOWED_BASE_URLS: ${CHATEXP_LLM_PROXY_ALLOWED_BASE_URLS:-}
+  CHATEXP_LLM_PROXY_TIMEOUT_SECONDS: ${CHATEXP_LLM_PROXY_TIMEOUT_SECONDS:-60}
+  CHATEXP_DOCLING_BASE_URL: ${CHATEXP_DOCLING_BASE_URL:-http://docling-serve:5001}
+  CHATEXP_DOCLING_TIMEOUT_SECONDS: ${CHATEXP_DOCLING_TIMEOUT_SECONDS:-1800}
+  CHATEXP_FILE_MAX_BYTES: ${CHATEXP_FILE_MAX_BYTES:-52428800}
+  CHATEXP_FILE_CACHE_TTL: ${CHATEXP_FILE_CACHE_TTL:-86400}
+  CHATEXP_SEATABLE_TIMEOUT_SECONDS: ${CHATEXP_SEATABLE_TIMEOUT_SECONDS:-60}
+  CHATEXP_SEATABLE_API_TOKEN: ${CHATEXP_SEATABLE_API_TOKEN:-}
+  CHATEXP_SEATABLE_SERVER: ${CHATEXP_SEATABLE_SERVER:-}
+  CHATEXP_PARSED_FILES_DIR: /workspace/parsed-files
+  CHATEXP_PARSED_FILES_MAX_BYTES: ${CHATEXP_PARSED_FILES_MAX_BYTES:-2147483648}
+  CHATEXP_PARSE_LOCK_TTL_SECONDS: ${CHATEXP_PARSE_LOCK_TTL_SECONDS:-600}
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes",
+              "--maxmemory", "${CHATEXP_REDIS_MAXMEMORY:-256mb}",
+              "--maxmemory-policy", "volatile-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.10
+
+  api:
+    image: chatexp-bo-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TORCH: "0"
+    restart: unless-stopped
+    environment:
+      <<: *worker-env
+      # Bypass the host HTTP_PROXY for inter-container traffic on the private
+      # network (docling-serve / redis) and localhost. The host proxy is still
+      # used for outbound calls (e.g. the LLM endpoint) — see CHATEXP_LLM_*.
+      CHATEXP_BO_API_KEY: ${CHATEXP_BO_API_KEY:-}
+      CHATEXP_CORS_ORIGINS: ${CHATEXP_CORS_ORIGINS:-*}
+      CHATEXP_BO_WORKSPACE: /workspace
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - bo-workspace:/workspace
+      - parsed-files:/workspace/parsed-files
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.20
+
+  # Parse lane: chatexp.files.parse + chatexp.files.edit (docling jobs and
+  # tracked-changes Word edits). Prefork + concurrency 2 — parses are I/O-bound
+  # waits on docling-serve and edits are I/O-bound waits on the LLM planner,
+  # so two run in parallel.
+  worker:
+    image: chatexp-bo-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TORCH: "1"
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    restart: unless-stopped
+    environment: *worker-env
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=INFO",
+              "-Q", "files", "--pool=prefork", "--concurrency=2"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - bo-workspace:/workspace
+      - parsed-files:/workspace/parsed-files
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.30
+
+  # Analysis + BO lane: chatexp.files.analyze and chatexp.bo.*. Solo pool —
+  # the analysis agent and the BO optimizer each assume they own the process.
+  worker-analysis:
+    image: chatexp-bo-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TORCH: "1"
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    restart: unless-stopped
+    environment: *worker-env
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=INFO",
+              "-Q", "analysis,bo", "--pool=solo", "--concurrency=1"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - bo-workspace:/workspace
+      - parsed-files:/workspace/parsed-files
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.50
+
+  # Celery beat: schedules the hourly chatexp.files.reconcile registry prune
+  # (redis volatile-lru never evicts the doc index ZSET on its own).
+  beat:
+    image: chatexp-bo-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_TORCH: "1"
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    restart: unless-stopped
+    environment: *worker-env
+    command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=INFO"]
+    # beat is a pure scheduler with nothing to probe (the image-level curl
+    # /health check belongs to the api); disable it rather than report
+    # permanently unhealthy.
+    healthcheck:
+      disable: true
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - bo-workspace:/workspace
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.60
+
+  # Layout-aware document parser (PDF/DOCX/PPTX/XLSX/images + OCR). CPU-only.
+  # Runs on the same private network as the api/worker; the model weights are
+  # downloaded once into a named volume so the container runs fully offline
+  # afterwards. Reached internally at http://docling-serve:5001.
+  docling-serve:
+    image: ghcr.io/docling-project/docling-serve-cpu:latest
+    restart: unless-stopped
+    environment:
+      NO_PROXY: "localhost,127.0.0.1,172.203.0.0/16,::1"
+      no_proxy: "localhost,127.0.0.1,172.203.0.0/16,::1"
+      # Suppress per-request access logs (uvicorn) so polling does not flood the
+      # log stream. Conversion progress/errors still surface at WARNING+.
+      DOCLING_SERVE_LOG_LEVEL: "WARNING"
+    volumes:
+      - docling-models:/root/.cache
+    networks:
+      chatexp_bo:
+        ipv4_address: 172.203.0.40
+
+volumes:
+  redis-data:
+  bo-workspace:
+  parsed-files:
+  docling-models:
+
+networks:
+  chatexp_bo:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.203.0.0/16

@@ -1,0 +1,11 @@
+[Field semantics and inference rules]
+- sheet_type: flat_table (single regular header + data rows) or complex_report (merged cells / multi-level headers / segmented layout). Judge from structure only, independent of domain.
+- header_row: the row_index of the header. Criteria: high text ratio, almost no pure numbers, and it explains the column count of the data rows below.
+- column_mapping: source column name -> canonical field name. Canonical names strip units, brackets, and whitespace; units are preserved in factors/objectives unit fields.
+- factor_candidates: columns that are plausibly operator-controllable inputs (few distinct values, ordered, or present in known_factor_names).
+- objective_candidates: response columns (continuous numeric, varying with inputs, or in known_objective_names / objective_hints).
+- factors: inferred from factor_candidates. kind: categorical if categories non-empty; ordinal if a finite discrete set (with min/max/step); else continuous. min/max/step must come from evidence in the data — never fabricated.
+- objectives: inferred from objective_candidates. goal from directional semantics in the column name or objective_hints (e.g., "minimum" / "loss" -> minimize); when evidence is insufficient, default to maximize and note the uncertainty.
+- records: data rows -> structured records; numeric columns converted to numbers, missing kept as null; row-ID columns mapped to candidate_id.
+- ignored_columns: pure comments, timestamps, and columns that cannot be explained.
+- All inferences must cite in-data evidence; write uncertain judgments to notes — never guess silently.

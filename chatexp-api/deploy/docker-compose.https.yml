@@ -1,0 +1,26 @@
+# Optional TLS reverse proxy. See deploy/README.md.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["https"]
+    depends_on:
+      - api
+    ports:
+      - "${CHATEXP_HTTPS_PORT:-18000}:${CHATEXP_HTTPS_PORT:-18000}"
+    environment:
+      CHATEXP_HTTPS_PORT: "${CHATEXP_HTTPS_PORT:-18000}"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/certs:/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      chatexp_bo:
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  chatexp_bo:

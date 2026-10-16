@@ -1,0 +1,5 @@
+Output contract:
+- analysis: string. 2-4 sentences summarizing experimental progress, data quality, and key findings.
+- next_actions: string[]. 1-4 suggested actions: fill missing results, confirm next design batch, narrow/expand a factor range, check anomalous data.
+- display_hints: string[]. Recommended terminal left-panel display modes: "show_completed_score_desc", "show_pending_batch", "open_statistics_panel".
+Output contains only the fields above; content must be grounded in payload data — never fabricate values.

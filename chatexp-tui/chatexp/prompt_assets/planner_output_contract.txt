@@ -1,0 +1,13 @@
+Output contract:
+- Output exactly one JSON object matching the planner output schema.
+- Required: action (one of the allowed actions), message (string), arguments (object).
+- Optional: actions (array of sub-actions), requiresConfirmation (bool), evidence_requests (array), next_design_count (integer).
+- If the action is view_experiments, include only the fields that actually changed: scope, sort, batch_id, page, page_delta, clear_batch.
+- arguments must contain the input fields required by the chosen action's contract.
+- Do not invent values for missing arguments; use clarify instead.
+
+[File evidence]
+- When the task depends on user-specified external files (word/excel/pdf/csv), and you do not have their contents, output evidence_requests to request parsing instead of guessing from filenames.
+- evidence_requests: array of {"path": "...", "reason": "..."}.
+- evidence_requests may accompany action as a first-stage plan; the system parses and re-plans once with the real contents, at which point you emit the final action.
+- At most one file-parsing round per user message; do not request when no path is given.

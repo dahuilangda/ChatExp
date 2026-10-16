@@ -1,0 +1,4 @@
+Output format:
+{
+  "column_mapping": {"<source>": "<target>", ...}
+}

@@ -1,0 +1,6 @@
+[Mapping semantics]
+- Keys of column_mapping must be actual source_columns; values must be actual target_fields. Never invent names on either side.
+- Map only when semantically equivalent: same physical quantity in different notation, unit spellings, casing, whitespace, or full/half-width variants — not surface similarity.
+- Units, brackets, and separators are part of the name: map across them when semantics match; leave unmapped when unclear.
+- One target maps to at most one source; ambiguous competitors stay unmapped (noted in ambiguity_notes for the caller to ask).
+- Unmappable source columns stay unmapped; do not force-fill.

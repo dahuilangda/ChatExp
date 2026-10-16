@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatexp-tui"
+version = "0.1.0"
+description = "Chat-driven experiment design TUI and MCP server"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2,<3",
+  "python-dotenv>=1,<2",
+  "mcp",
+  "pandas",
+  "numpy",
+  "torch",
+  "openpyxl",
+  "xlsxwriter",
+  "matplotlib",
+  "seaborn",
+  "python-dateutil",
+  "pyyaml",
+  "pydantic>=2,<3",
+  "typer>=0.12,<1",
+  "rich>=13,<14",
+  "textual>=0.63,<2",
+  "pypdf>=3,<7",
+  "python-docx>=1,<2",
+  "tabulate>=0.9",
+]
+
+[project.scripts]
+chatexp = "chatexp.cli:app"
+chatexp-mcp = "chatexp.mcp_server:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.package-data]
+chatexp = ["prompt_assets/*.txt", "skill_specs/*.md", "skill_specs/**/*.md"]
+
+[tool.setuptools.packages.find]
+where = ["."]

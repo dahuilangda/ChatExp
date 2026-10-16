@@ -1,0 +1,15 @@
+Output format:
+{
+  "sheet_type": "flat_table | grouped_records | plate_report | matrix | unknown",
+  "header_row": 1,
+  "workbook_name": "optional, a suitable .xlsx filename for saving this experiment project",
+  "notes": "optional, brief description of the recognized structure",
+  "ignored_columns": ["column to ignore"],
+  "factor_candidates": ["factor1", "factor2"],
+  "objective_candidates": ["objective1"],
+  "factors": [{"name": "...", "kind": "continuous|ordinal|categorical", "unit": "...", "min_value": ..., "max_value": ..., "step": ..., "categories": []}],
+  "objectives": [{"name": "...", "goal": "maximize|minimize", "weight": 1.0, "unit": "..."}],
+  "column_mapping": {"source column": "canonical name"},
+  "records": [{"candidate_id": "...", "canonical_name": value, ...}]
+}
+All fields must be grounded in the input rows. Do not invent column names or values.

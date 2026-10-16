@@ -1,0 +1,72 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments, caches and build output
+__pycache__/
+*.py[cod]
+.venv*/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+*.egg
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage*
+htmlcov/
+coverage.xml
+
+# Local runtime data and deployment certificates
+/data/
+*.log
+*.pid
+celerybeat-schedule*
+workerbeat-schedule*
+/chatexp-api/deploy/certs/
+acme-data/
+
+# Only the compiled SeaTable archive is distributed
+*.zip
+/chatexp-seatable-plugin/*
+!chatexp-seatable-plugin/*.zip
+
+# Development and private materials
+tests/
+test/
+evals/
+benchmarks/
+test_*.py
+*_test.py
+conftest.py
+pytest.ini
+requirements-dev.txt
+requirements-evaluation.txt
+release_*.json
+/chatexp-article/
+*.docx
+*.doc
+*.rtf
+*.tex
+*.bib
+论文*
+审稿*
+*送审*
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

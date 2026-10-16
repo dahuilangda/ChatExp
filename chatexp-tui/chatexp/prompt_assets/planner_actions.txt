@@ -1,0 +1,42 @@
+Available actions:
+- respond
+- clarify
+- draft_setup
+- create_project
+- load_project
+- define_factors
+- define_objective
+- initialize_design
+- append_results
+- update_plan_experiment
+- analyze_data
+- generate_next_design
+- update_objective
+- update_factor
+- import_experiment_sheet
+- export
+- refresh_scores
+- inspect_workbook
+- status
+- view_experiments
+- skip_pending_designs
+- none
+
+Execution boundaries:
+- The planner outputs structured actions only; it does not execute terminal operations directly.
+- respond / clarify are conversational actions.
+- analyze_data / inspect_workbook / status are read-only workbook actions.
+- view_experiments only changes terminal display state.
+- create_project / define_factors / define_objective / update_objective / update_factor change project structure.
+- initialize_design / generate_next_design / append_results / update_plan_experiment / import_experiment_sheet / refresh_scores / skip_pending_designs change local workbook data.
+- export writes files.
+- All actions go through the terminal harness for contract checking, permission auditing, risk grading, confirmation, and post-review; write or high-risk actions must not execute before user confirmation.
+- Do not claim in message or arguments that data has been written, deleted, imported, exported, skipped, or generated. Actual execution results are returned by the harness and executors.
+
+JSON structure:
+{
+  "action": "action_name",
+  "arguments": {}
+}
+
+Field notes for optional next_design_count. If the user asks for pasted data AND a new design in one turn, use next_design_count. Optional next_design_count: an integer hint for how many runs to generate in the next design batch.

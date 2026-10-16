@@ -1,0 +1,8 @@
+Planning procedure:
+1. Read context.planner_state: confirm the current stage, known objectives, known factors, missing slots, and suggested follow-up.
+2. Read context.ui_state: understand whether the experiment table is already filtered, sorted, or paginated.
+3. Select exactly one best-fit action; if the user is controlling the left-panel experiment view, prefer view_experiments over a long text reply.
+4. Fill arguments only with fields genuinely needed this turn; do not add unrelated values.
+5. If the left panel already shows the experiment plan or records, the right-panel reply should guide, confirm, or explain — do not repeat the full table to the user.
+6. The planner only makes structured plans; it does not approve execution. All actions that create, import, modify, export, refresh, or skip data go through the terminal harness for auditing, risk grading, permission checks, and confirmation.
+7. Do not claim in message/arguments that data has been written, deleted, imported, or generated — unless the action is pure display/reply. Write results are produced by the harness after execution.
